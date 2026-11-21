@@ -82,6 +82,14 @@ class EventHandler:
 
             self.hass.bus.async_fire("alarmo_command_success", data)
 
+        elif event == const.EVENT_SENSOR_TRIPPED:
+            data = {
+                "area_id": area_id,
+                "entity_id": alarm_entity.entity_id,
+                **args,
+            }
+            self.hass.bus.async_fire("alarmo_sensor_tripped", data)
+
         elif event == const.EVENT_READY_TO_ARM_MODES_CHANGED:
             supported_modes = dict(
                 filter(

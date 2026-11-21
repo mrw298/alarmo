@@ -38,6 +38,7 @@ This is an alarm system integration for Home Assistant. It provides a user inter
       - [alarmo\_command\_success](#alarmo_command_success)
       - [alarmo\_ready\_to\_arm\_modes\_updated](#alarmo_ready_to_arm_modes_updated)
         - [Creating readiness indicator entities](#creating-readiness-indicator-entities)
+      - [alarmo\_sensor\_tripped](#alarmo_sensor_tripped)
     - [MQTT](#mqtt)
       - [State topic](#state-topic)
       - [Event topic](#event-topic)
@@ -477,6 +478,22 @@ template:
       - name: "Alarmo Ready To Arm Away"
         state: '{{ trigger.event.data.armed_away }}'
 ```
+
+#### alarmo_sensor_tripped
+This event is sent each time a sensor trips, meaning it reaches a state that would trigger the alarm (or abort arming) in the current arm mode.
+It is also sent when a sensor trips while the alarm is already triggered, which is otherwise not visible.
+This can be used for example to see which further sensors were activated after the alarm was triggered.
+When a sensor group causes a trip, the event is sent for each sensor in the group.
+
+The following table provides the data that is provided with the `alarmo_sensor_tripped` event:
+| Property      | Description                                                                                                                                                             | Example value                |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `entity_id`   | Entity-ID of the alarm. Particularly useful in case multiple areas are configured.                                                                                      | `alarm_control_panel.alarmo` |
+| `area_id`     | Internal ID assigned by Alarmo to the area. Particularly useful in case multiple areas are configured. Unaffected by renaming of the area (in contrast to `entity_id`). | `12345678`                   |
+| `sensor`      | Entity-ID of the sensor that tripped.                                                                                                                                   | `binary_sensor.front_door`   |
+| `sensor_type` | Sensor type as configured in Alarmo.                                                                                                                                    | `door`                       |
+| `state`       | State of the sensor. Possible values: `open`, `unavailable` (only for sensors with *Trigger when unavailable* enabled).                                                 | `open`                       |
+| `alarm_state` | State of the alarm at the moment the sensor tripped.                                                                                                                    | `armed_away`                 |
 
 
 ### MQTT

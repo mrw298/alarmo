@@ -28,6 +28,7 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.components.lock import LockState
 from homeassistant.helpers.dispatcher import (
+    dispatcher_send,
     async_dispatcher_connect,
 )
 from homeassistant.components.alarm_control_panel import AlarmControlPanelState
@@ -463,6 +464,15 @@ class SensorHandler:
                 self.stop_arm_timer(entity)
 
         if res:
+            if alarm_state == AlarmControlPanelState.TRIGGERED and not (
+                sensor_state_allowed(
+                    new_state,
+                    sensor_config,
+                    alarm_entity.arm_mode or AlarmControlPanelState.DISARMED,
+                )
+            ):
+                # sensor would have tripped, but the alarm is already triggered
+                self._fire_sensor_tripped({entity: new_state}, alarm_state)
             # nothing to do here, sensor state is OK
             self.update_ready_to_arm_status(sensor_config["area"])
             return
@@ -579,6 +589,8 @@ class SensorHandler:
             self.update_ready_to_arm_status(sensor_config["area"])
             return
 
+        self._fire_sensor_tripped(open_sensors, alarm_state)
+
         if sensor_config[ATTR_ALWAYS_ON]:
             # immediate trigger due to always on sensor
             _LOGGER.info(
@@ -638,6 +650,25 @@ class SensorHandler:
                 )
 
         self.update_ready_to_arm_status(sensor_config["area"])
+
+    def _fire_sensor_tripped(self, open_sensors: dict, alarm_state: str):
+        """Report each tripped sensor, so its trip can be acted upon."""
+        for entity, state in open_sensors.items():
+            if entity == ATTR_GROUP_ID:
+                continue
+            sensor_config = self._config[entity]
+            dispatcher_send(
+                self.hass,
+                "alarmo_event",
+                const.EVENT_SENSOR_TRIPPED,
+                sensor_config["area"],
+                {
+                    "sensor": entity,
+                    "sensor_type": sensor_config["type"],
+                    "state": state,
+                    "alarm_state": alarm_state,
+                },
+            )
 
     def process_group_event(self, entity: str, state: str) -> dict:
         """Check if sensor entity is member of a group to evaluate trigger."""
