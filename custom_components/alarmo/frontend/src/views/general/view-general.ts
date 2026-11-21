@@ -12,6 +12,7 @@ import { commonStyle } from '../../styles';
 import { exportPath, Path } from '../../common/navigation';
 
 import './alarm-mode-card';
+import './confirmation-card';
 import './mqtt-config-card.ts';
 import './area-config-card.ts';
 import '../../components/alarmo-settings-row';
@@ -167,6 +168,8 @@ export class AlarmViewGeneral extends SubscribeMixin(LitElement) {
         </ha-card>
 
         <alarm-mode-card .hass=${this.hass} .narrow=${this.narrow}></alarm-mode-card>
+
+        <confirmation-card .hass=${this.hass} .narrow=${this.narrow}></confirmation-card>
 
         <area-config-card .hass=${this.hass} .narrow=${this.narrow}></area-config-card>
       `;

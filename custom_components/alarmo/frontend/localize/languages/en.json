@@ -88,6 +88,38 @@
             }
           }
         },
+        "confirmation": {
+          "title": "Alarm confirmation",
+          "description": "Optionally report whether an alarm is confirmed by a second, independent sensor (in the style of PD 6662 / BS 8243). The first sensor still triggers the alarm as usual. Use the actions and notifications for 'Alarm is confirmed' to escalate your response. Default values are derived from the standards and should be checked against their current editions.",
+          "fields": {
+            "confirmation_enabled": {
+              "heading": "Confirmation",
+              "description": "Track whether a triggered alarm is confirmed by a second sensor."
+            },
+            "confirmation_time": {
+              "heading": "Confirmation time",
+              "description": "Period after the alarm is triggered in which a second sensor confirms the alarm."
+            },
+            "confirmation_rule": {
+              "heading": "Confirmation rule",
+              "description": "Which pairs of sensors confirm each other.",
+              "choose": {
+                "different_sensor": {
+                  "name": "Any two sensors",
+                  "description": "Any two different sensors confirm the alarm. Two entities of the same device never confirm each other."
+                },
+                "different_area": {
+                  "name": "Sensors in different rooms",
+                  "description": "The two sensors must be in different Home Assistant areas (rooms). Sensors without an area are treated as for 'Any two sensors'."
+                },
+                "same_area": {
+                  "name": "Sensors in the same room",
+                  "description": "The two sensors must be in the same Home Assistant area (room). Stricter: unrelated sensors in different rooms (pets, draughts) cannot confirm each other, but an intruder moving between rooms is not confirmed either. Sensors without an area never confirm."
+                }
+              }
+            }
+          }
+        },
         "mqtt": {
           "title": "MQTT configuration",
           "description": "This panel can be used for configuration of the MQTT interface.",
@@ -266,6 +298,10 @@
             "trigger_unavailable": {
               "heading": "Trigger when unavailable",
               "description": "When the sensor state becomes 'unavailable', this will activate the sensor."
+            },
+            "entry_route": {
+              "heading": "Entry route",
+              "description": "The sensor is on the entry route (e.g. hall motion sensor). Once the entry delay has started, it no longer confirms an alarm."
             }
           },
           "actions": {
@@ -466,6 +502,18 @@
                 "pending": {
                   "name": "Entry delay started",
                   "description": "Entry delay started, the alarm will trigger soon."
+                },
+                "unconfirmed": {
+                  "name": "Alarm is unconfirmed",
+                  "description": "The alarm is triggered, waiting for confirmation by a second sensor"
+                },
+                "confirmed": {
+                  "name": "Alarm is confirmed",
+                  "description": "A second, independent sensor confirmed the alarm"
+                },
+                "confirmation_expired": {
+                  "name": "Alarm confirmation expired",
+                  "description": "No second sensor confirmed the alarm within the confirmation time"
                 }
               }
             },

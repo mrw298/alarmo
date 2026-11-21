@@ -111,7 +111,23 @@ export const computeEventDisplay = (event: EAlarmEvent, hass: HomeAssistant) => 
         ),
         icon: 'hass:home-import-outline',
       };
+    default:
+      return {
+        value: event,
+        name: localize(`panels.actions.cards.new_notification.fields.event.choose.${event}.name`, hass.language),
+        description: localize(
+          `panels.actions.cards.new_notification.fields.event.choose.${event}.description`,
+          hass.language
+        ),
+        icon: EConfirmationEventIcons[event],
+      };
   }
+};
+
+const EConfirmationEventIcons: Partial<Record<EAlarmEvent, string>> = {
+  [EAlarmEvent.Unconfirmed]: 'hass:shield-alert-outline',
+  [EAlarmEvent.Confirmed]: 'hass:shield-alert',
+  [EAlarmEvent.ConfirmationExpired]: 'hass:shield-check-outline',
 };
 
 export const computeAreaDisplay = (
@@ -395,6 +411,15 @@ export const getWildcardOptions = (event?: EAlarmEvent, alarmoConfig?: AlarmoCon
       {
         name: 'Delay',
         value: '{{delay}}',
+      },
+    ];
+
+  if (!event || [EAlarmEvent.Confirmed].includes(event))
+    options = [
+      ...options,
+      {
+        name: 'Confirmed By',
+        value: '{{confirmed_by}}',
       },
     ];
 

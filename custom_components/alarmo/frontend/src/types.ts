@@ -116,6 +116,7 @@ export type AlarmoSensor = {
   new_entity_id?: string;
   entry_delay: number | null;
   delay_on: number | null;
+  entry_route?: boolean;
 };
 
 export type AlarmoUser = {
@@ -161,6 +162,15 @@ export enum EAlarmEvent {
   ArmFailure = 'arm_failure',
   Arming = 'arming',
   Pending = 'pending',
+  Unconfirmed = 'unconfirmed',
+  Confirmed = 'confirmed',
+  ConfirmationExpired = 'confirmation_expired',
+}
+
+export enum EConfirmationRule {
+  DifferentSensor = 'different_sensor',
+  DifferentArea = 'different_area',
+  SameArea = 'same_area',
 }
 
 export type MqttConfig = {
@@ -183,6 +193,9 @@ export type AlarmoArea = {
   name: string;
   enabled: boolean;
   modes: Record<EArmModes, AlarmoModeConfig>;
+  confirmation_enabled?: boolean;
+  confirmation_time?: number;
+  confirmation_rule?: EConfirmationRule;
 };
 
 export type SensorGroup = {

@@ -461,6 +461,24 @@ export class SensorEditorCard extends SubscribeMixin(LitElement) {
               @change=${(ev: Event) => this._SetData({ trigger_unavailable: (ev.target as HTMLInputElement).checked })}
             ></ha-switch>
           </alarmo-settings-row>
+
+          ${this.data.area && this.areas[this.data.area]?.confirmation_enabled
+        ? html`
+                <alarmo-settings-row .narrow=${this.narrow}>
+                  <span slot="heading">
+                    ${localize('panels.sensors.cards.editor.fields.entry_route.heading', this.hass.language)}
+                  </span>
+                  <span slot="description">
+                    ${localize('panels.sensors.cards.editor.fields.entry_route.description', this.hass.language)}
+                  </span>
+
+                  <ha-switch
+                    ?checked=${this.data.entry_route}
+                    @change=${(ev: Event) => this._SetData({ entry_route: (ev.target as HTMLInputElement).checked })}
+                  ></ha-switch>
+                </alarmo-settings-row>
+              `
+        : ''}
         </alarmo-collapsible-section>
 
         <div class="card-actions">
@@ -527,6 +545,9 @@ export class SensorEditorCard extends SubscribeMixin(LitElement) {
           break;
         case 'trigger_unavailable':
           this.data = { ...this.data, trigger_unavailable: val == true };
+          break;
+        case 'entry_route':
+          this.data = { ...this.data, entry_route: val == true };
           break;
         case 'entry_delay':
           this.data = { ...this.data, entry_delay: val as number | null };
