@@ -43,6 +43,13 @@ from homeassistant.components.alarm_control_panel import (
 )
 
 from . import const
+from .confirmation import (
+    STATUS_IDLE,
+    STATUS_EXPIRED,
+    STATUS_CONFIRMED,
+    STATUS_UNCONFIRMED,
+    ConfirmationTracker,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -587,6 +594,8 @@ class AlarmoBaseEntity(AlarmControlPanelEntity, RestoreEntity):
             self.open_sensors = None
             self.bypassed_sensors = None
             self.async_update_state(AlarmControlPanelState.DISARMED)
+            if self.area_id:
+                self.confirmation.reset()
             if self.changed_by:
                 _LOGGER.info(
                     "Alarm '%s' is disarmed by %s.",
@@ -854,6 +863,8 @@ class AlarmoBaseEntity(AlarmControlPanelEntity, RestoreEntity):
         clear_timer = getattr(self, "async_clear_timer", None)
         if clear_timer is not None:
             clear_timer()
+        if self.area_id:
+            self.confirmation.cancel_timer()
         await super().async_will_remove_from_hass()
         _LOGGER.debug(
             "%s is removed from hass",
@@ -872,6 +883,7 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
 
         self.area_id = area_id
         self._timer = None
+        self.confirmation = ConfirmationTracker(hass, self)
         coordinator = self.hass.data[const.DOMAIN]["coordinator"]
         self._config = coordinator.store.async_get_config()
         self._config.update(coordinator.store.async_get_area(self.area_id))
@@ -880,6 +892,14 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
     def unique_id(self):
         """Return a unique ID based on the stable area identifier."""
         return f"{const.DOMAIN}_area_{self.area_id}"
+
+    @property
+    def extra_state_attributes(self):
+        """Return the data of the entity."""
+        attributes = super().extra_state_attributes
+        if self.confirmation.enabled:
+            attributes.update(self.confirmation.attributes)
+        return attributes
 
     @property
     def supported_features(self) -> int:
@@ -933,6 +953,29 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
         self.async_on_remove(
             async_dispatcher_connect(
                 self.hass, "alarmo_config_updated", async_update_config
+            )
+        )
+
+        @callback
+        def async_handle_sensor_tripped(event: str, area_id: str, args: dict = {}):
+            if event != const.EVENT_SENSOR_TRIPPED or area_id != self.area_id:
+                return
+            sensor_handler = self.hass.data[const.DOMAIN]["sensor_handler"]
+            self.confirmation.record_trip(args, sensor_handler._config[args["sensor"]])
+
+        @callback
+        def async_handle_state_updated(area_id: str, old_state: str, state: str):
+            if area_id == self.area_id and state == AlarmControlPanelState.TRIGGERED:
+                self.confirmation.async_evaluate()
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, "alarmo_event", async_handle_sensor_tripped
+            )
+        )
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, "alarmo_state_updated", async_handle_state_updated
             )
         )
 
@@ -1346,6 +1389,38 @@ class AlarmoMasterEntity(AlarmoBaseEntity):
         return f"{const.DOMAIN}_master"
 
     @property
+    def extra_state_attributes(self):
+        """Return the data of the entity, combining confirmation of all areas."""
+        attributes = super().extra_state_attributes
+        trackers = [
+            item.confirmation
+            for item in self.hass.data[const.DOMAIN]["areas"].values()
+            if item.confirmation.enabled
+        ]
+        if trackers:
+            order = [
+                STATUS_CONFIRMED,
+                STATUS_UNCONFIRMED,
+                STATUS_EXPIRED,
+                STATUS_IDLE,
+            ]
+            expires = [el.expires for el in trackers if el.expires]
+            attributes.update(
+                {
+                    "confirmation_status": min(
+                        (el.status for el in trackers), key=order.index
+                    ),
+                    "confirmed_by": [
+                        entity for el in trackers for entity in el.confirmed_by
+                    ],
+                    "confirmation_expires": (
+                        min(expires).isoformat() if expires else None
+                    ),
+                }
+            )
+        return attributes
+
+    @property
     def supported_features(self) -> int:
         """Return the list of supported features."""
         areas = self.hass.data[const.DOMAIN].get("areas", {})
@@ -1413,6 +1488,9 @@ class AlarmoMasterEntity(AlarmoBaseEntity):
 
         @callback
         def async_handle_event(event: str, area_id: str, args: dict = {}):
+            if area_id and event in const.CONFIRMATION_EVENTS:
+                self.schedule_update_ha_state()
+                return
             if not area_id or event not in [
                 const.EVENT_FAILED_TO_ARM,
                 const.EVENT_TRIGGER,

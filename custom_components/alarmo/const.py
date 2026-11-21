@@ -98,6 +98,14 @@ EVENT_NO_CODE_PROVIDED = "no_code_provided"
 EVENT_TRIGGER_TIME_EXPIRED = "trigger_time_expired"
 EVENT_READY_TO_ARM_MODES_CHANGED = "ready_to_arm_modes_changed"
 EVENT_SENSOR_TRIPPED = "sensor_tripped"
+EVENT_UNCONFIRMED = "unconfirmed"
+EVENT_CONFIRMED = "confirmed"
+EVENT_CONFIRMATION_EXPIRED = "confirmation_expired"
+CONFIRMATION_EVENTS = [
+    EVENT_UNCONFIRMED,
+    EVENT_CONFIRMED,
+    EVENT_CONFIRMATION_EXPIRED,
+]
 
 ATTR_MODES = "modes"
 ATTR_ARM_MODE = "arm_mode"

@@ -16,6 +16,10 @@ from .helpers import omit
 from .sensors import (
     SENSOR_TYPE_OTHER,
 )
+from .confirmation import (
+    RULE_DIFFERENT_SENSOR,
+    DEFAULT_CONFIRMATION_TIME,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,6 +28,12 @@ STORAGE_KEY = f"{const.DOMAIN}.storage"
 STORAGE_VERSION_MAJOR = 6
 STORAGE_VERSION_MINOR = 3
 SAVE_DELAY = 10
+
+AREA_CONFIRMATION_KEYS = [
+    "confirmation_enabled",
+    "confirmation_time",
+    "confirmation_rule",
+]
 
 
 @attr.s(slots=True, frozen=True)
@@ -73,6 +83,9 @@ class AreaEntry:
             const.CONF_ALARM_ARMED_VACATION: ModeEntry(),
         },
     )
+    confirmation_enabled = attr.ib(type=bool, default=False)
+    confirmation_time = attr.ib(type=int, default=DEFAULT_CONFIRMATION_TIME)
+    confirmation_rule = attr.ib(type=str, default=RULE_DIFFERENT_SENSOR)
 
 
 @attr.s(slots=True, frozen=True)
@@ -108,6 +121,7 @@ class SensorEntry:
     enabled = attr.ib(type=bool, default=True)
     entry_delay = attr.ib(type=int, default=None)
     delay_on = attr.ib(type=int, default=None)
+    entry_route = attr.ib(type=bool, default=False)
 
 
 @attr.s(slots=True, frozen=True)
@@ -389,7 +403,14 @@ class AlarmoStorage:
                         for (mode, config) in area["modes"].items()
                     }
                     areas[area["area_id"]] = AreaEntry(
-                        area_id=area["area_id"], name=area["name"], modes=modes
+                        area_id=area["area_id"],
+                        name=area["name"],
+                        modes=modes,
+                        **{
+                            key: area[key]
+                            for key in AREA_CONFIRMATION_KEYS
+                            if key in area
+                        },
                     )
 
             if "sensors" in data:

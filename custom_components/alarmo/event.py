@@ -82,6 +82,14 @@ class EventHandler:
 
             self.hass.bus.async_fire("alarmo_command_success", data)
 
+        elif event in const.CONFIRMATION_EVENTS:
+            data = {
+                "area_id": area_id,
+                "entity_id": alarm_entity.entity_id,
+                **args,
+            }
+            self.hass.bus.async_fire(f"alarmo_{event}", data)
+
         elif event == const.EVENT_SENSOR_TRIPPED:
             data = {
                 "area_id": area_id,

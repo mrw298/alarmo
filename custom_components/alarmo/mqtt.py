@@ -178,6 +178,19 @@ class MqttHandler:
                         for (entity, state) in args["open_sensors"].items()
                     ],
                 }
+            elif event in const.CONFIRMATION_EVENTS:
+                payload = {
+                    "event": event.upper(),
+                    "sensors": [
+                        {
+                            "entity_id": el["entity_id"],
+                            "name": friendly_name_for_entity_id(
+                                el["entity_id"], self.hass
+                            ),
+                        }
+                        for el in args["sensors"]
+                    ],
+                }
             elif event == const.EVENT_COMMAND_NOT_ALLOWED:
                 payload = {
                     "event": event.upper(),

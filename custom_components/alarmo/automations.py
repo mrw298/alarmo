@@ -147,7 +147,11 @@ class AutomationHandler:
 
         @callback
         async def async_handle_event(event: str, area_id: str, args: dict = {}):
-            if event != const.EVENT_FAILED_TO_ARM:
+            if event == const.EVENT_FAILED_TO_ARM:
+                trigger_event = EVENT_ARM_FAILURE
+            elif event in const.CONFIRMATION_EVENTS:
+                trigger_event = event
+            else:
                 return
             if area_id:
                 alarm_entity = self.hass.data[const.DOMAIN]["areas"][area_id]
@@ -155,20 +159,30 @@ class AutomationHandler:
                 alarm_entity = self.hass.data[const.DOMAIN]["master"]
 
             _LOGGER.debug(
-                "%s has failed to arm",
+                "%s has event %s",
                 alarm_entity.entity_id,
+                trigger_event,
             )
+
+            targets = [(area_id, alarm_entity)]
+            master = self.hass.data[const.DOMAIN].get("master")
+            if event in const.CONFIRMATION_EVENTS and master:
+                # areas do not pass these events on to the master entity
+                targets.append((None, master))
 
             for automation_id, config in self._config.items():
                 if not config[const.ATTR_ENABLED]:
                     continue
-                for trigger in config[const.ATTR_TRIGGERS]:
-                    if (
-                        validate_area(trigger, area_id, self.hass)
-                        and validate_modes(trigger, alarm_entity._arm_mode)
-                        and validate_trigger(trigger, EVENT_ARM_FAILURE)
-                    ):
-                        await self.async_execute_automation(automation_id, alarm_entity)
+                for target_area_id, target_entity in targets:
+                    for trigger in config[const.ATTR_TRIGGERS]:
+                        if (
+                            validate_area(trigger, target_area_id, self.hass)
+                            and validate_modes(trigger, target_entity._arm_mode)
+                            and validate_trigger(trigger, trigger_event)
+                        ):
+                            await self.async_execute_automation(
+                                automation_id, target_entity
+                            )
 
         self._subscriptions.append(
             async_dispatcher_connect(self.hass, "alarmo_event", async_handle_event)
@@ -270,7 +284,7 @@ class AutomationHandler:
 
         return result
 
-    async def replace_wildcards_in_string(
+    async def replace_wildcards_in_string(  # noqa: PLR0912
         self, input: str, alarm_entity: AlarmoBaseEntity
     ):
         """Look for wildcards in string and replace them with content."""
@@ -305,6 +319,17 @@ class AutomationHandler:
                     parts.append(name)
                 bypassed_sensors = ", ".join(parts)
             input = input.replace("{{bypassed_sensors}}", bypassed_sensors)
+
+        # process wildcard '{{confirmed_by}}'
+        if "{{confirmed_by}}" in input:
+            confirmed_by = alarm_entity.extra_state_attributes.get("confirmed_by")
+            input = input.replace(
+                "{{confirmed_by}}",
+                ", ".join(
+                    friendly_name_for_entity_id(entity_id, self.hass)
+                    for entity_id in confirmed_by or []
+                ),
+            )
 
         # process wildcard '{{arm_mode}}'
         res = re.search(r"{{arm_mode(\|lang=([^}]+))?}}", input)

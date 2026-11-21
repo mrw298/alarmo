@@ -56,6 +56,13 @@ from .sensors import (
     ATTR_AUTO_BYPASS_MODES,
     ATTR_TRIGGER_UNAVAILABLE,
 )
+from .confirmation import (
+    ATTR_ENTRY_ROUTE,
+    CONFIRMATION_RULES,
+    ATTR_CONFIRMATION_RULE,
+    ATTR_CONFIRMATION_TIME,
+    ATTR_CONFIRMATION_ENABLED,
+)
 
 
 @callback
@@ -181,6 +188,9 @@ class AlarmoAreaView(HomeAssistantView):
                 vol.Optional("area_id"): cv.string,
                 vol.Optional(ATTR_NAME): cv.string,
                 vol.Optional(const.ATTR_REMOVE): cv.boolean,
+                vol.Optional(ATTR_CONFIRMATION_ENABLED): cv.boolean,
+                vol.Optional(ATTR_CONFIRMATION_TIME): cv.positive_int,
+                vol.Optional(ATTR_CONFIRMATION_RULE): vol.In(CONFIRMATION_RULES),
                 vol.Optional(const.ATTR_MODES): vol.Schema(
                     {
                         vol.Optional(const.CONF_ALARM_ARMED_AWAY): mode_schema,
@@ -237,6 +247,7 @@ class AlarmoSensorView(HomeAssistantView):
                 vol.Optional(ATTR_GROUP): vol.Any(cv.string, None),
                 vol.Optional(ATTR_ENTRY_DELAY): vol.Any(cv.positive_int, None),
                 vol.Optional(ATTR_DELAY_ON): vol.Any(cv.positive_int, None),
+                vol.Optional(ATTR_ENTRY_ROUTE): cv.boolean,
                 vol.Optional(ATTR_NEW_ENTITY_ID): cv.string,
             }
         )
