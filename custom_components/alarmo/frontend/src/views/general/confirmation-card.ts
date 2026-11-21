@@ -151,6 +151,73 @@ export class ConfirmationCard extends SubscribeMixin(LitElement) {
               </alarmo-settings-row>
             `
           : ''}
+
+        <alarmo-settings-row .narrow=${this.narrow}>
+          <span slot="heading">
+            ${localize(
+              'panels.general.cards.confirmation.fields.hold_up_confirmation_enabled.heading',
+              this.hass.language
+            )}
+          </span>
+          <span slot="description">
+            ${localize(
+              'panels.general.cards.confirmation.fields.hold_up_confirmation_enabled.description',
+              this.hass.language
+            )}
+          </span>
+          <ha-switch
+            ?checked=${area.hold_up_confirmation_enabled}
+            @change=${(ev: Event) =>
+              this.saveData(ev, { hold_up_confirmation_enabled: (ev.target as HTMLInputElement).checked })}
+          ></ha-switch>
+        </alarmo-settings-row>
+
+        ${area.hold_up_confirmation_enabled
+          ? html`
+              <alarmo-settings-row .narrow=${this.narrow} nested>
+                <span slot="heading">
+                  ${localize(
+                    'panels.general.cards.confirmation.fields.hold_up_confirmation_time.heading',
+                    this.hass.language
+                  )}
+                </span>
+                <span slot="description">
+                  ${localize(
+                    'panels.general.cards.confirmation.fields.hold_up_confirmation_time.description',
+                    this.hass.language
+                  )}
+                </span>
+                <alarmo-duration-picker
+                  .hass=${this.hass}
+                  max="86400"
+                  step="3600"
+                  value=${area.hold_up_confirmation_time || 28800}
+                  @value-changed=${(ev: CustomEvent) =>
+                    this.saveData(ev, { hold_up_confirmation_time: ev.detail.value })}
+                ></alarmo-duration-picker>
+              </alarmo-settings-row>
+
+              <alarmo-settings-row .narrow=${this.narrow} nested>
+                <span slot="heading">
+                  ${localize(
+                    'panels.general.cards.confirmation.fields.hold_up_tamper_confirms.heading',
+                    this.hass.language
+                  )}
+                </span>
+                <span slot="description">
+                  ${localize(
+                    'panels.general.cards.confirmation.fields.hold_up_tamper_confirms.description',
+                    this.hass.language
+                  )}
+                </span>
+                <ha-switch
+                  ?checked=${area.hold_up_tamper_confirms}
+                  @change=${(ev: Event) =>
+                    this.saveData(ev, { hold_up_tamper_confirms: (ev.target as HTMLInputElement).checked })}
+                ></ha-switch>
+              </alarmo-settings-row>
+            `
+          : ''}
       </ha-card>
     `;
   }

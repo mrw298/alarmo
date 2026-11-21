@@ -120,7 +120,19 @@
             },
             "confirmation_require_reset": {
               "heading": "Require reset",
-              "description": "After a confirmed alarm, the area cannot be armed again until the alarm is reset with the alarmo.reset_confirmation action, using the code of a user who may disarm the alarm. Disarming works as usual."
+              "description": "After a confirmed alarm (intruder or hold-up), the area cannot be armed again until the alarm is reset with the alarmo.reset_confirmation action, using the code of a user who may disarm the alarm. Disarming works as usual."
+            },
+            "hold_up_confirmation_enabled": {
+              "heading": "Hold-up confirmation",
+              "description": "Track whether an activation of a hold-up (panic) device is confirmed by a second hold-up device. This works in every state of the alarm, also when disarmed."
+            },
+            "hold_up_confirmation_time": {
+              "heading": "Hold-up confirmation time",
+              "description": "Period after a hold-up activation in which a second hold-up device confirms it."
+            },
+            "hold_up_tamper_confirms": {
+              "heading": "Tamper confirms hold-up",
+              "description": "A tamper signal from any active tamper sensor after a hold-up activation also confirms it."
             }
           }
         },
@@ -256,6 +268,10 @@
                 "environmental": {
                   "name": "Environmental",
                   "description": "Smoke/gas sensor, leak detector, etc. (not related to burglar protection)."
+                },
+                "hold_up": {
+                  "name": "Hold-up",
+                  "description": "Hold-up (panic) button or pendant. Always active, also when disarmed."
                 },
                 "other": {
                   "name": "Generic"
@@ -518,6 +534,18 @@
                 "confirmation_expired": {
                   "name": "Alarm confirmation expired",
                   "description": "No second sensor confirmed the alarm within the confirmation time"
+                },
+                "hold_up": {
+                  "name": "Hold-up activated",
+                  "description": "A hold-up device was activated, waiting for confirmation"
+                },
+                "hold_up_confirmed": {
+                  "name": "Hold-up is confirmed",
+                  "description": "A second hold-up device (or a tamper signal) confirmed the hold-up"
+                },
+                "hold_up_expired": {
+                  "name": "Hold-up confirmation expired",
+                  "description": "The hold-up was not confirmed within the hold-up confirmation time"
                 }
               }
             },

@@ -19,6 +19,7 @@ from .sensors import (
 from .confirmation import (
     RULE_DIFFERENT_SENSOR,
     DEFAULT_CONFIRMATION_TIME,
+    DEFAULT_HOLD_UP_CONFIRMATION_TIME,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,6 +35,9 @@ AREA_CONFIRMATION_KEYS = [
     "confirmation_time",
     "confirmation_rule",
     "confirmation_require_reset",
+    "hold_up_confirmation_enabled",
+    "hold_up_confirmation_time",
+    "hold_up_tamper_confirms",
 ]
 
 
@@ -88,6 +92,11 @@ class AreaEntry:
     confirmation_time = attr.ib(type=int, default=DEFAULT_CONFIRMATION_TIME)
     confirmation_rule = attr.ib(type=str, default=RULE_DIFFERENT_SENSOR)
     confirmation_require_reset = attr.ib(type=bool, default=False)
+    hold_up_confirmation_enabled = attr.ib(type=bool, default=False)
+    hold_up_confirmation_time = attr.ib(
+        type=int, default=DEFAULT_HOLD_UP_CONFIRMATION_TIME
+    )
+    hold_up_tamper_confirms = attr.ib(type=bool, default=False)
 
 
 @attr.s(slots=True, frozen=True)

@@ -27,6 +27,9 @@ EVENTS = [
     "alarmo_unconfirmed",
     "alarmo_confirmed",
     "alarmo_confirmation_expired",
+    "alarmo_hold_up",
+    "alarmo_hold_up_confirmed",
+    "alarmo_hold_up_expired",
 ]
 
 
@@ -127,6 +130,8 @@ class Setup:
             await self.hass.async_block_till_done()
         for event in EVENTS:
             self.hass.bus.async_listen(event, self.events.append)
+        if expect == "disarmed":
+            return
         await self.hass.services.async_call(
             "alarmo",
             "arm",

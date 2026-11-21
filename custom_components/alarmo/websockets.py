@@ -62,7 +62,10 @@ from .confirmation import (
     ATTR_CONFIRMATION_RULE,
     ATTR_CONFIRMATION_TIME,
     ATTR_CONFIRMATION_ENABLED,
+    ATTR_HOLD_UP_TAMPER_CONFIRMS,
+    ATTR_HOLD_UP_CONFIRMATION_TIME,
     ATTR_CONFIRMATION_REQUIRE_RESET,
+    ATTR_HOLD_UP_CONFIRMATION_ENABLED,
 )
 
 
@@ -193,6 +196,9 @@ class AlarmoAreaView(HomeAssistantView):
                 vol.Optional(ATTR_CONFIRMATION_TIME): cv.positive_int,
                 vol.Optional(ATTR_CONFIRMATION_RULE): vol.In(CONFIRMATION_RULES),
                 vol.Optional(ATTR_CONFIRMATION_REQUIRE_RESET): cv.boolean,
+                vol.Optional(ATTR_HOLD_UP_CONFIRMATION_ENABLED): cv.boolean,
+                vol.Optional(ATTR_HOLD_UP_CONFIRMATION_TIME): cv.positive_int,
+                vol.Optional(ATTR_HOLD_UP_TAMPER_CONFIRMS): cv.boolean,
                 vol.Optional(const.ATTR_MODES): vol.Schema(
                     {
                         vol.Optional(const.CONF_ALARM_ARMED_AWAY): mode_schema,

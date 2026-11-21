@@ -16,6 +16,7 @@ from homeassistant.components.alarm_control_panel import AlarmControlPanelState
 from . import const
 from .sensors import (
     SENSOR_TYPE_TAMPER,
+    SENSOR_TYPE_HOLD_UP,
     SENSOR_TYPE_ENVIRONMENTAL,
 )
 
@@ -36,9 +37,13 @@ ATTR_CONFIRMATION_TIME = "confirmation_time"
 ATTR_CONFIRMATION_RULE = "confirmation_rule"
 ATTR_CONFIRMATION_REQUIRE_RESET = "confirmation_require_reset"
 ATTR_ENTRY_ROUTE = "entry_route"
+ATTR_HOLD_UP_CONFIRMATION_ENABLED = "hold_up_confirmation_enabled"
+ATTR_HOLD_UP_CONFIRMATION_TIME = "hold_up_confirmation_time"
+ATTR_HOLD_UP_TAMPER_CONFIRMS = "hold_up_tamper_confirms"
 
 # defaults derived from the standards, to be verified against current editions
 DEFAULT_CONFIRMATION_TIME = 1800
+DEFAULT_HOLD_UP_CONFIRMATION_TIME = 28800
 
 
 def resolve_area_and_device(hass: HomeAssistant, entity_id: str):
@@ -79,6 +84,16 @@ def pair_satisfies_rule(rule: str, first: dict, second: dict) -> bool:
 class ConfirmationTracker:
     """Track whether an intruder alarm of an area is confirmed by a second sensor."""
 
+    ENABLED_KEY = ATTR_CONFIRMATION_ENABLED
+    TIME_KEY = ATTR_CONFIRMATION_TIME
+    DEFAULT_TIME = DEFAULT_CONFIRMATION_TIME
+    EVENTS = (
+        const.EVENT_UNCONFIRMED,
+        const.EVENT_CONFIRMED,
+        const.EVENT_CONFIRMATION_EXPIRED,
+    )
+    ATTRIBUTE_KEYS = ("confirmation_status", "confirmed_by", "confirmation_expires")
+
     def __init__(self, hass: HomeAssistant, alarm_entity) -> None:
         """Initialize the tracker."""
         self.hass = hass
@@ -97,7 +112,7 @@ class ConfirmationTracker:
     @property
     def enabled(self) -> bool:
         """Return whether confirmation is enabled for the area."""
-        return bool(self._config.get(ATTR_CONFIRMATION_ENABLED))
+        return bool(self._config.get(self.ENABLED_KEY))
 
     @property
     def rule(self) -> str:
@@ -107,10 +122,11 @@ class ConfirmationTracker:
     @property
     def attributes(self) -> dict:
         """Return the entity attributes describing the confirmation status."""
+        (status, confirmed_by, expires) = self.ATTRIBUTE_KEYS
         return {
-            "confirmation_status": self.status,
-            "confirmed_by": self.confirmed_by,
-            "confirmation_expires": self.expires.isoformat() if self.expires else None,
+            status: self.status,
+            confirmed_by: self.confirmed_by,
+            expires: self.expires.isoformat() if self.expires else None,
             "reset_required": self._alarm_entity.reset_required,
         }
 
@@ -126,7 +142,7 @@ class ConfirmationTracker:
             or not alarm.arm_mode
             or alarm.state
             not in (AlarmControlPanelState.PENDING, AlarmControlPanelState.TRIGGERED)
-            or args["sensor_type"] == SENSOR_TYPE_ENVIRONMENTAL
+            or args["sensor_type"] in (SENSOR_TYPE_ENVIRONMENTAL, SENSOR_TYPE_HOLD_UP)
             or is_tamper(self.hass, entity_id, args["sensor_type"])
         ):
             return
@@ -144,16 +160,23 @@ class ConfirmationTracker:
             _LOGGER.debug("Ignoring entry route sensor %s for confirmation", entity_id)
             return
 
-        if entity_id not in self._trips:
-            (ha_area_id, device_id) = resolve_area_and_device(self.hass, entity_id)
-            if not ha_area_id:
-                _LOGGER.debug("Sensor %s has no area for confirmation", entity_id)
-            self._trips[entity_id] = {
-                "entity_id": entity_id,
-                "ha_area_id": ha_area_id,
-                "device_id": device_id,
-            }
+        self._add_trip(entity_id)
         self.async_evaluate()
+
+    def _add_trip(self, entity_id: str) -> dict:
+        if entity_id not in self._trips:
+            self._trips[entity_id] = self._describe(entity_id)
+        return self._trips[entity_id]
+
+    def _describe(self, entity_id: str) -> dict:
+        (ha_area_id, device_id) = resolve_area_and_device(self.hass, entity_id)
+        if not ha_area_id:
+            _LOGGER.debug("Sensor %s has no area for confirmation", entity_id)
+        return {
+            "entity_id": entity_id,
+            "ha_area_id": ha_area_id,
+            "device_id": device_id,
+        }
 
     @callback
     def async_evaluate(self) -> None:
@@ -171,9 +194,7 @@ class ConfirmationTracker:
                 return
 
     def _open_window(self) -> None:
-        delay = int(
-            self._config.get(ATTR_CONFIRMATION_TIME) or DEFAULT_CONFIRMATION_TIME
-        )
+        delay = int(self._config.get(self.TIME_KEY) or self.DEFAULT_TIME)
         self.status = STATUS_UNCONFIRMED
         self.expires = (dt_util.utcnow() + datetime.timedelta(seconds=delay)).replace(
             microsecond=0
@@ -181,28 +202,32 @@ class ConfirmationTracker:
         self._timer = async_track_point_in_time(
             self.hass, self._async_window_expired, self.expires
         )
-        self._fire(const.EVENT_UNCONFIRMED, list(self._trips.values()))
+        self._fire(self.EVENTS[0], list(self._trips.values()))
 
     def _confirm(self, pair: list[dict]) -> None:
         self.cancel_timer()
-        self.status = STATUS_CONFIRMED
-        self.confirmed_by = [el["entity_id"] for el in pair]
         self.expires = None
-        if self._config.get(ATTR_CONFIRMATION_REQUIRE_RESET):
-            self._alarm_entity.reset_required = True
-        _LOGGER.info("Alarm '%s' is confirmed", self._alarm_entity.name)
-        self._fire(const.EVENT_CONFIRMED, pair)
+        self._set_confirmed(pair)
         if self._alarm_entity.state != AlarmControlPanelState.TRIGGERED:
             self._alarm_entity.async_trigger(
                 entry_delay=0, open_sensors=dict.fromkeys(self.confirmed_by, STATE_OPEN)
             )
 
+    def _set_confirmed(self, pair: list[dict]) -> None:
+        self.status = STATUS_CONFIRMED
+        self.confirmed_by = [el["entity_id"] for el in pair]
+        if self._config.get(ATTR_CONFIRMATION_REQUIRE_RESET):
+            self._alarm_entity.reset_required = True
+        _LOGGER.info("Alarm '%s' is confirmed (%s)", self._alarm_entity.name, pair)
+        self._fire(self.EVENTS[1], pair)
+
     @callback
     def _async_window_expired(self, _now) -> None:
         self._timer = None
-        self.status = STATUS_EXPIRED
         self.expires = None
-        self._fire(const.EVENT_CONFIRMATION_EXPIRED, list(self._trips.values()))
+        if self.status == STATUS_UNCONFIRMED:
+            self.status = STATUS_EXPIRED
+            self._fire(self.EVENTS[2], list(self._trips.values()))
         self.reset()
 
     def _fire(self, event: str, sensors: list[dict]) -> None:
@@ -237,3 +262,56 @@ class ConfirmationTracker:
         self._trips = {}
         self._entry_started = False
         self._alarm_entity.schedule_update_ha_state()
+
+
+class HoldUpTracker(ConfirmationTracker):
+    """Track whether a hold-up (panic) alarm is confirmed, in any arm state."""
+
+    ENABLED_KEY = ATTR_HOLD_UP_CONFIRMATION_ENABLED
+    TIME_KEY = ATTR_HOLD_UP_CONFIRMATION_TIME
+    DEFAULT_TIME = DEFAULT_HOLD_UP_CONFIRMATION_TIME
+    EVENTS = (
+        const.EVENT_HOLD_UP,
+        const.EVENT_HOLD_UP_CONFIRMED,
+        const.EVENT_HOLD_UP_EXPIRED,
+    )
+    ATTRIBUTE_KEYS = ("hold_up_status", "hold_up_confirmed_by", "hold_up_expires")
+
+    @property
+    def rule(self) -> str:
+        """Hold-up devices only need to be independent of each other."""
+        return RULE_DIFFERENT_SENSOR
+
+    @callback
+    def record_trip(self, args: dict, sensor_config: dict) -> None:
+        """Record a hold-up activation, or a tamper signal confirming it."""
+        entity_id = args["sensor"]
+        if (
+            not self.enabled
+            or self.status == STATUS_CONFIRMED
+            or args["state"] != STATE_OPEN
+        ):
+            return
+        if args["sensor_type"] == SENSOR_TYPE_HOLD_UP:
+            self._add_trip(entity_id)
+            self.async_evaluate()
+        elif (
+            self.status == STATUS_UNCONFIRMED
+            and self._config.get(ATTR_HOLD_UP_TAMPER_CONFIRMS)
+            and is_tamper(self.hass, entity_id, args["sensor_type"])
+        ):
+            first = next(iter(self._trips.values()))
+            self._set_confirmed([first, self._describe(entity_id)])
+
+    @callback
+    def async_evaluate(self) -> None:
+        """Open the window on the first activation, then look for a pair."""
+        if not self._trips or self.status == STATUS_CONFIRMED:
+            return
+        if self.status == STATUS_IDLE:
+            self._open_window()
+        for first, second in itertools.combinations(self._trips.values(), 2):
+            if pair_satisfies_rule(self.rule, first, second):
+                # the window keeps running, at its end the status returns to idle
+                self._set_confirmed([first, second])
+                return

@@ -125,6 +125,20 @@ export const sensorConfigByType = (modeList: EArmModes[]): Dictionary<Partial<Al
       use_entry_delay: false,
       use_exit_delay: false,
     },
+    [ESensorTypes.HoldUp]: {
+      modes: filterModes([
+        EArmModes.ArmedAway,
+        EArmModes.ArmedHome,
+        EArmModes.ArmedNight,
+        EArmModes.ArmedVacation,
+        EArmModes.ArmedCustom,
+      ]),
+      always_on: true,
+      allow_open: false,
+      arm_on_close: false,
+      use_entry_delay: false,
+      use_exit_delay: false,
+    },
   };
 };
 

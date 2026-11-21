@@ -41,7 +41,9 @@ from .store import async_get_registry
 from .sensors import (
     ATTR_GROUP,
     ATTR_ENTITIES,
+    ATTR_ALWAYS_ON,
     ATTR_NEW_ENTITY_ID,
+    SENSOR_TYPE_HOLD_UP,
     SensorHandler,
 )
 from .websockets import async_register_websockets
@@ -250,6 +252,10 @@ class AlarmoCoordinator(DataUpdateCoordinator):
         if ATTR_GROUP in data:
             group = data[ATTR_GROUP]
             del data[ATTR_GROUP]
+
+        if data.get(const.ATTR_TYPE) == SENSOR_TYPE_HOLD_UP:
+            # hold-up devices are always active
+            data[ATTR_ALWAYS_ON] = True
 
         if ATTR_NEW_ENTITY_ID in data:
             # delete old sensor entry when changing the entity_id

@@ -313,6 +313,7 @@ The following table defines the sensor types and the predefined configuration:
 | Motion        | `motion`<br>`moving`<br>`occupancy`<br>`presence`                          | `Armed Away`<br>`Armed Vacation`                                   | `Use exit delay`<br>`Use entry delay`     |
 | Tamper        | `tamper`<br>`sound`<br>`vibration`                                         | `Armed Away`<br>`Armed Home`<br>`Armed Night`<br>`Armed Vacation`  | -                                         |
 | Environmental | `carbon_monoxide`<br>`gas`<br> `heat`<br>`moisture`<br>`smoke`<br>`safety` | N/A                                                                | `Always on`                               |
+| Hold-up       | - (set manually)                                                           | N/A                                                                | `Always on` (cannot be disabled)          |
 
 
 #### Configuration options
@@ -384,6 +385,22 @@ The status is shown in the attributes of the alarm entity (only for areas that h
 
 For [actions and notifications](#automations), the conditions *Alarm is unconfirmed*, *Alarm is confirmed* and *Alarm confirmation expired* are available, and the `{{confirmed_by}}` wildcard gives the names of the confirming sensors.
 The same moments are sent as the events `alarmo_unconfirmed`, `alarmo_confirmed` and `alarmo_confirmation_expired` (and on the MQTT event topic). The event data contains `entity_id` and `area_id` (as for other Alarmo events), the `rule`, and `sensors`: a list with the `entity_id`, `ha_area_id` and `device_id` of each sensor (for `alarmo_confirmed`, the confirming pair).
+
+#### Hold-up confirmation
+Sensors of type *Hold-up* are hold-up (panic) buttons or pendants. They are always active, so an activation triggers the alarm in every state (also when disarmed), as for other *Always on* sensors. They never count for intruder confirmation.
+
+Hold-up confirmation is enabled separately per area, and works in every state of the alarm:
+
+| Option                      | Description                                                                                                  | Default  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------ | -------- |
+| `Hold-up confirmation`      | Enable hold-up confirmation for the area.                                                                    | off      |
+| `Hold-up confirmation time` | Period after a hold-up activation in which a second hold-up device confirms it.                              | 8 hours  |
+| `Tamper confirms hold-up`   | A tamper signal from any tamper sensor (that is active at that moment) after a hold-up activation also confirms it. | off      |
+
+A second activation must come from a different hold-up device: the same button, or another entity of the same HA device, does not confirm.
+Disarming does **not** reset hold-up tracking: it ends when the confirmation time ends (with `alarmo_hold_up_expired` if it was not confirmed), or by [alarmo.reset_confirmation](#alarmoreset_confirmation) when `Require reset` is enabled, in which case a confirmed hold-up also blocks arming.
+
+The status is shown in the attributes `hold_up_status`, `hold_up_confirmed_by` and `hold_up_expires`. The conditions *Hold-up activated*, *Hold-up is confirmed* and *Hold-up confirmation expired* are available for actions and notifications (with the `{{hold_up_confirmed_by}}` wildcard), and the events `alarmo_hold_up`, `alarmo_hold_up_confirmed` and `alarmo_hold_up_expired` are sent, with the same data as for intruder confirmation.
 
 **Note:** the default values are derived from the standards as understood at the time of writing. Check them against the current editions (and with your alarm receiving centre or insurer, where applicable) before relying on them.
 

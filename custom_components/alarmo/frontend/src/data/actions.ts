@@ -128,6 +128,9 @@ const EConfirmationEventIcons: Partial<Record<EAlarmEvent, string>> = {
   [EAlarmEvent.Unconfirmed]: 'hass:shield-alert-outline',
   [EAlarmEvent.Confirmed]: 'hass:shield-alert',
   [EAlarmEvent.ConfirmationExpired]: 'hass:shield-check-outline',
+  [EAlarmEvent.HoldUp]: 'hass:alarm-light-outline',
+  [EAlarmEvent.HoldUpConfirmed]: 'hass:alarm-light',
+  [EAlarmEvent.HoldUpExpired]: 'hass:alarm-light-off-outline',
 };
 
 export const computeAreaDisplay = (
@@ -420,6 +423,15 @@ export const getWildcardOptions = (event?: EAlarmEvent, alarmoConfig?: AlarmoCon
       {
         name: 'Confirmed By',
         value: '{{confirmed_by}}',
+      },
+    ];
+
+  if (!event || [EAlarmEvent.HoldUpConfirmed].includes(event))
+    options = [
+      ...options,
+      {
+        name: 'Hold-up Confirmed By',
+        value: '{{hold_up_confirmed_by}}',
       },
     ];
 

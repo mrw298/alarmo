@@ -1,4 +1,4 @@
-import { mdiAirplane, mdiAlertCircle, mdiCheckCircle, mdiCropPortrait, mdiDoorClosed, mdiDoorOpen, mdiFire, mdiFireAlert, mdiHome, mdiLock, mdiMoonWaningCrescent, mdiMotionSensor, mdiMotionSensorOff, mdiShield, mdiVibrate, mdiWindowClosed, mdiWindowOpen } from "@mdi/js";
+import { mdiAirplane, mdiAlarmLight, mdiAlarmLightOutline, mdiAlertCircle, mdiCheckCircle, mdiCropPortrait, mdiDoorClosed, mdiDoorOpen, mdiFire, mdiFireAlert, mdiHome, mdiLock, mdiMoonWaningCrescent, mdiMotionSensor, mdiMotionSensorOff, mdiShield, mdiVibrate, mdiWindowClosed, mdiWindowOpen } from "@mdi/js";
 
 export const VERSION = '1.10.19';
 
@@ -40,6 +40,7 @@ export enum ESensorTypes {
   Motion = 'motion',
   Tamper = 'tamper',
   Environmental = 'environmental',
+  HoldUp = 'hold_up',
   Other = 'other',
 }
 
@@ -49,6 +50,7 @@ export const ESensorIcons = {
   Motion: mdiMotionSensorOff,
   Tamper: mdiCropPortrait,
   Environmental: mdiFire,
+  HoldUp: mdiAlarmLightOutline,
   Other: mdiCheckCircle
 }
 
@@ -58,6 +60,7 @@ export const ESensorIconsActive = {
   Motion: mdiMotionSensor,
   Tamper: mdiVibrate,
   Environmental: mdiFireAlert,
+  HoldUp: mdiAlarmLight,
   Other: mdiAlertCircle
 }
 

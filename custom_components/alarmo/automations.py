@@ -320,16 +320,17 @@ class AutomationHandler:
                 bypassed_sensors = ", ".join(parts)
             input = input.replace("{{bypassed_sensors}}", bypassed_sensors)
 
-        # process wildcard '{{confirmed_by}}'
-        if "{{confirmed_by}}" in input:
-            confirmed_by = alarm_entity.extra_state_attributes.get("confirmed_by")
-            input = input.replace(
-                "{{confirmed_by}}",
-                ", ".join(
-                    friendly_name_for_entity_id(entity_id, self.hass)
-                    for entity_id in confirmed_by or []
-                ),
-            )
+        # process wildcards '{{confirmed_by}}' and '{{hold_up_confirmed_by}}'
+        for key in ("confirmed_by", "hold_up_confirmed_by"):
+            if f"{{{{{key}}}}}" in input:
+                confirmed_by = alarm_entity.extra_state_attributes.get(key)
+                input = input.replace(
+                    f"{{{{{key}}}}}",
+                    ", ".join(
+                        friendly_name_for_entity_id(entity_id, self.hass)
+                        for entity_id in confirmed_by or []
+                    ),
+                )
 
         # process wildcard '{{arm_mode}}'
         res = re.search(r"{{arm_mode(\|lang=([^}]+))?}}", input)

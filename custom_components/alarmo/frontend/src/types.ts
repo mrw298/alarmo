@@ -165,6 +165,9 @@ export enum EAlarmEvent {
   Unconfirmed = 'unconfirmed',
   Confirmed = 'confirmed',
   ConfirmationExpired = 'confirmation_expired',
+  HoldUp = 'hold_up',
+  HoldUpConfirmed = 'hold_up_confirmed',
+  HoldUpExpired = 'hold_up_expired',
 }
 
 export enum EConfirmationRule {
@@ -197,6 +200,9 @@ export type AlarmoArea = {
   confirmation_time?: number;
   confirmation_rule?: EConfirmationRule;
   confirmation_require_reset?: boolean;
+  hold_up_confirmation_enabled?: boolean;
+  hold_up_confirmation_time?: number;
+  hold_up_tamper_confirms?: boolean;
 };
 
 export type SensorGroup = {

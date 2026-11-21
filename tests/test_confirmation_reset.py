@@ -146,6 +146,7 @@ async def test_reset_required_survives_restart(
     setup = Setup(hass)
     setup.sensor("pir")
     await setup.start(confirmation_require_reset=True, expect="disarmed")
+    await _call(hass, "arm", "1234")
 
     assert setup.attributes["reset_required"] is True
     assert setup.status == "confirmed"

@@ -48,6 +48,7 @@ from .confirmation import (
     STATUS_EXPIRED,
     STATUS_CONFIRMED,
     STATUS_UNCONFIRMED,
+    HoldUpTracker,
     ConfirmationTracker,
 )
 
@@ -891,6 +892,7 @@ class AlarmoBaseEntity(AlarmControlPanelEntity, RestoreEntity):
             clear_timer()
         if self.area_id:
             self.confirmation.cancel_timer()
+            self.hold_up.cancel_timer()
         await super().async_will_remove_from_hass()
         _LOGGER.debug(
             "%s is removed from hass",
@@ -911,6 +913,7 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
         self._timer = None
         self.reset_required = False
         self.confirmation = ConfirmationTracker(hass, self)
+        self.hold_up = HoldUpTracker(hass, self)
         coordinator = self.hass.data[const.DOMAIN]["coordinator"]
         self._config = coordinator.store.async_get_config()
         self._config.update(coordinator.store.async_get_area(self.area_id))
@@ -924,8 +927,9 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
     def extra_state_attributes(self):
         """Return the data of the entity."""
         attributes = super().extra_state_attributes
-        if self.confirmation.enabled:
-            attributes.update(self.confirmation.attributes)
+        for tracker in (self.confirmation, self.hold_up):
+            if tracker.enabled:
+                attributes.update(tracker.attributes)
         return attributes
 
     @property
@@ -988,7 +992,9 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
             if event != const.EVENT_SENSOR_TRIPPED or area_id != self.area_id:
                 return
             sensor_handler = self.hass.data[const.DOMAIN]["sensor_handler"]
-            self.confirmation.record_trip(args, sensor_handler._config[args["sensor"]])
+            sensor_config = sensor_handler._config[args["sensor"]]
+            self.confirmation.record_trip(args, sensor_config)
+            self.hold_up.record_trip(args, sensor_config)
 
         @callback
         def async_handle_state_updated(area_id: str, old_state: str, state: str):
@@ -1010,8 +1016,11 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
         state = await self.async_get_last_state()
         if state and state.attributes.get("reset_required"):
             self.reset_required = True
-            self.confirmation.status = STATUS_CONFIRMED
-            self.confirmation.confirmed_by = state.attributes.get("confirmed_by") or []
+            for tracker in (self.confirmation, self.hold_up):
+                confirmed_by = state.attributes.get(tracker.ATTRIBUTE_KEYS[1])
+                if confirmed_by:
+                    tracker.status = STATUS_CONFIRMED
+                    tracker.confirmed_by = confirmed_by
         if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             initial_state = state.state
             _LOGGER.debug(
@@ -1402,7 +1411,9 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
         if not self.reset_required:
             return
         self.reset_required = False
-        self.confirmation.reset(force=True)
+        for tracker in (self.confirmation, self.hold_up):
+            if tracker.status == STATUS_CONFIRMED:
+                tracker.reset(force=True)
         _LOGGER.info("Confirmed alarm of '%s' is reset", self.name)
         dispatcher_send(
             self.hass,
@@ -1449,34 +1460,24 @@ class AlarmoMasterEntity(AlarmoBaseEntity):
     def extra_state_attributes(self):
         """Return the data of the entity, combining confirmation of all areas."""
         attributes = super().extra_state_attributes
-        trackers = [
-            item.confirmation
-            for item in self.hass.data[const.DOMAIN]["areas"].values()
-            if item.confirmation.enabled
-        ]
-        if trackers:
-            order = [
-                STATUS_CONFIRMED,
-                STATUS_UNCONFIRMED,
-                STATUS_EXPIRED,
-                STATUS_IDLE,
+        areas = self.hass.data[const.DOMAIN]["areas"].values()
+        order = [STATUS_CONFIRMED, STATUS_UNCONFIRMED, STATUS_EXPIRED, STATUS_IDLE]
+        for name in ("confirmation", "hold_up"):
+            trackers = [
+                getattr(item, name) for item in areas if getattr(item, name).enabled
             ]
-            expires = [el.expires for el in trackers if el.expires]
+            if not trackers:
+                continue
+            (status, confirmed_by, expires) = trackers[0].ATTRIBUTE_KEYS
+            expiries = [el.expires for el in trackers if el.expires]
             attributes.update(
                 {
-                    "confirmation_status": min(
-                        (el.status for el in trackers), key=order.index
-                    ),
-                    "confirmed_by": [
+                    status: min((el.status for el in trackers), key=order.index),
+                    confirmed_by: [
                         entity for el in trackers for entity in el.confirmed_by
                     ],
-                    "confirmation_expires": (
-                        min(expires).isoformat() if expires else None
-                    ),
-                    "reset_required": any(
-                        item.reset_required
-                        for item in self.hass.data[const.DOMAIN]["areas"].values()
-                    ),
+                    expires: min(expiries).isoformat() if expiries else None,
+                    "reset_required": any(item.reset_required for item in areas),
                 }
             )
         return attributes
