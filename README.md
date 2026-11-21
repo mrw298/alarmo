@@ -25,6 +25,7 @@ This is an alarm system integration for Home Assistant. It provides a user inter
       - [Sensor types](#sensor-types)
       - [Configuration options](#configuration-options)
       - [Sensor groups](#sensor-groups)
+    - [Alarm confirmation](#alarm-confirmation)
     - [Codes and users](#codes-and-users)
       - [Codes](#codes)
     - [Services](#services)
@@ -329,6 +330,7 @@ This is done for your convenience, if this is undesired you can clear the sensor
 | `Arm after closing`        | Deactivation of the sensor during the exit delay causes the alarm to proceed to *armed* state.<br>If other sensors are still active at this moment, the arming fails.<br>Alarmo uses a built-in 5 seconds delay to allow for contact bounce (the chattering of a door when pulling it shut).                                                                            | Front door sensor (combined with `Allow open after arming` on motion sensors which may be still active). |
 | `Bypass automatically`     | If the sensor is still active when the alarm is armed, the sensor will be excluded from the alarm (instead of causing the arming to fail) until the alarm is disarmed again.<br>This setting can be defined per arm mode.                                                                                                                                               | Windows that may be left open (e.g. when going to sleep).                                                |
 | `Trigger when unavailable` | If the sensor state becomes *unavailable* this is treated the same as the sensor being activated.<br>HA defines the *unavailable* state for sensors for which the state is undeterminate (can be either open or closed). This usually occurs when a battery-powered sensor loses connection to the gateway, but it could also be the result of tampering of the sensor. | Sensors for which reliability is important.                                                              |
+| `Entry route`              | Only shown when [alarm confirmation](#alarm-confirmation) is enabled for the area. Once the entry delay has started, the sensor no longer confirms an alarm.                                                                                                                                                                                                          | Motion sensors in the hall and other sensors on the path from the entrance to the alarm panel.          |
 
 #### Sensor groups
 This functionality is aimed to reduce the risk of false triggers in your house, which are (unfortunately) a reality - especially with PIR motion sensors.
@@ -340,6 +342,47 @@ Any sensor can be added to a group, but a sensor can only be member of 1 group. 
 A sensor group needs to have at least 2 sensors to function correctly (else it would never be triggered), and needs to be configured with a time-out time, after which consecutive sensor events are not longer considered related.
 
 Clicking the 'setup groups' button while editing a sensor brings you to an overview of existing groups and allows you to create new ones and edit existing ones.
+
+### Alarm confirmation
+Alarm confirmation is optional and disabled by default. It is modelled on the sequential confirmation used in the UK (PD 6662 / BS 8243): an alarm is *confirmed* when a second, independent sensor trips within a confirmation time after the alarm was triggered.
+
+Confirmation does **not** suppress or delay anything: the first sensor triggers the alarm exactly as before. It only tells you whether the alarm was confirmed, so that you can escalate your response (e.g. a critical notification, an external sounder or calling a keyholder) for confirmed alarms only. Unlike [sensor groups](#sensor-groups), which filter out triggers, confirmation classifies an alarm that has already been triggered.
+
+Confirmation is configured per area in the *General* tab:
+
+| Option              | Description                                                                                                                         | Default            |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| `Confirmation`      | Enable confirmation for the area.                                                                                                   | off                |
+| `Confirmation time` | Period after the alarm is triggered in which a second sensor confirms the alarm. It continues after the trigger time has ended.     | 30 minutes         |
+| `Confirmation rule` | Which pairs of sensors confirm each other (see below).                                                                              | Any two sensors    |
+
+The rules use the areas (rooms) of Home Assistant, not Alarmo areas. The area of a sensor is taken from its entity, or else from its device.
+
+| Rule                         | Confirms when                                    | Trade-off                                                                                                                                                                   |
+| ---------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Any two sensors              | any two different sensors trip                   | Matches the standards. Two false triggers anywhere in the house can confirm each other.                                                                                    |
+| Sensors in different rooms   | the two sensors are in different rooms           | Sensors in the same room (e.g. a PIR and a door contact affected by the same draught) cannot confirm each other. Sensors without an area are treated as for *Any two sensors*. |
+| Sensors in the same room     | the two sensors are in the same room             | Stricter than the standards: unrelated sensors in different rooms (pets, heating draughts) cannot confirm each other, but an intruder moving between rooms is **not** confirmed. Sensors without an area never confirm. |
+
+The following always applies:
+- The same sensor tripping repeatedly never confirms, and two entities of the same device (e.g. a dual technology motion sensor) never confirm each other.
+- Only genuine intruder detections count: sensors that trip by becoming unavailable, *tamper* and *environmental* sensors (and sensors with device class *tamper*) never confirm.
+- Sensors with the `Entry route` option (shown in the sensor settings once confirmation is enabled) do not count once the entry delay has started, so that someone entering through the normal entry route cannot confirm an alarm. The sensor that started the entry delay is still recorded as the first trip.
+- When a [sensor group](#sensor-groups) triggers, each sensor of the group counts as a separate trip.
+- Disarming the alarm resets the confirmation. If the alarm returns to armed after the trigger time, a sensor tripping within the confirmation time confirms the alarm and triggers it again immediately.
+
+The status is shown in the attributes of the alarm entity (only for areas that have confirmation enabled; the master entity combines its areas):
+
+| Attribute              | Description                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `confirmation_status`  | `idle`, `unconfirmed` (waiting for a second sensor), `confirmed` or `expired`. |
+| `confirmed_by`         | The two sensors that confirmed the alarm.                                     |
+| `confirmation_expires` | End of the confirmation time, while waiting for a second sensor.              |
+
+For [actions and notifications](#automations), the conditions *Alarm is unconfirmed*, *Alarm is confirmed* and *Alarm confirmation expired* are available, and the `{{confirmed_by}}` wildcard gives the names of the confirming sensors.
+The same moments are sent as the events `alarmo_unconfirmed`, `alarmo_confirmed` and `alarmo_confirmation_expired` (and on the MQTT event topic). The event data contains `entity_id` and `area_id` (as for other Alarmo events), the `rule`, and `sensors`: a list with the `entity_id`, `ha_area_id` and `device_id` of each sensor (for `alarmo_confirmed`, the confirming pair).
+
+**Note:** the default values are derived from the standards as understood at the time of writing. Check them against the current editions (and with your alarm receiving centre or insurer, where applicable) before relying on them.
 
 ### Codes and users
 
