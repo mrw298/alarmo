@@ -129,6 +129,26 @@ export class ConfirmationCard extends SubscribeMixin(LitElement) {
                     })}
                 ></alarmo-select>
               </alarmo-settings-row>
+
+              <alarmo-settings-row .narrow=${this.narrow} nested>
+                <span slot="heading">
+                  ${localize(
+                    'panels.general.cards.confirmation.fields.confirmation_require_reset.heading',
+                    this.hass.language
+                  )}
+                </span>
+                <span slot="description">
+                  ${localize(
+                    'panels.general.cards.confirmation.fields.confirmation_require_reset.description',
+                    this.hass.language
+                  )}
+                </span>
+                <ha-switch
+                  ?checked=${area.confirmation_require_reset}
+                  @change=${(ev: Event) =>
+                    this.saveData(ev, { confirmation_require_reset: (ev.target as HTMLInputElement).checked })}
+                ></ha-switch>
+              </alarmo-settings-row>
             `
           : ''}
       </ha-card>

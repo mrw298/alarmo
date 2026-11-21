@@ -106,6 +106,8 @@ CONFIRMATION_EVENTS = [
     EVENT_CONFIRMED,
     EVENT_CONFIRMATION_EXPIRED,
 ]
+EVENT_CONFIRMATION_RESET = "confirmation_reset"
+REASON_RESET_REQUIRED = "reset_required"
 
 ATTR_MODES = "modes"
 ATTR_ARM_MODE = "arm_mode"
@@ -231,6 +233,14 @@ SERVICE_DISARM_SCHEMA = cv.make_entity_service_schema(
 SERVICE_SKIP_DELAY_SCHEMA = cv.make_entity_service_schema(
     {
         vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+    }
+)
+
+SERVICE_RESET_CONFIRMATION = "reset_confirmation"
+SERVICE_RESET_CONFIRMATION_SCHEMA = cv.make_entity_service_schema(
+    {
+        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+        vol.Optional(CONF_CODE, default=""): cv.string,
     }
 )
 

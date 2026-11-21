@@ -6,6 +6,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 from . import const
+from .helpers import omit
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,11 +55,11 @@ class EventHandler:
             }
 
             data = dict(
-                **args,
+                **omit(args, ["reason"]),
                 **{
                     "area_id": area_id,
                     "entity_id": alarm_entity.entity_id,
-                    "reason": reasons[event],
+                    "reason": args.get("reason", reasons[event]),
                 },
             )
             if "open_sensors" in data:
@@ -82,7 +83,7 @@ class EventHandler:
 
             self.hass.bus.async_fire("alarmo_command_success", data)
 
-        elif event in const.CONFIRMATION_EVENTS:
+        elif event in [*const.CONFIRMATION_EVENTS, const.EVENT_CONFIRMATION_RESET]:
             data = {
                 "area_id": area_id,
                 "entity_id": alarm_entity.entity_id,

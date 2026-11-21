@@ -117,6 +117,10 @@
                   "description": "The two sensors must be in the same Home Assistant area (room). Stricter: unrelated sensors in different rooms (pets, draughts) cannot confirm each other, but an intruder moving between rooms is not confirmed either. Sensors without an area never confirm."
                 }
               }
+            },
+            "confirmation_require_reset": {
+              "heading": "Require reset",
+              "description": "After a confirmed alarm, the area cannot be armed again until the alarm is reset with the alarmo.reset_confirmation action, using the code of a user who may disarm the alarm. Disarming works as usual."
             }
           }
         },

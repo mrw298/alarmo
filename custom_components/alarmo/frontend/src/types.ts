@@ -196,6 +196,7 @@ export type AlarmoArea = {
   confirmation_enabled?: boolean;
   confirmation_time?: number;
   confirmation_rule?: EConfirmationRule;
+  confirmation_require_reset?: boolean;
 };
 
 export type SensorGroup = {

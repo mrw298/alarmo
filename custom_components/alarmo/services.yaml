@@ -61,6 +61,20 @@ skip_delay:
         entity:
           integration: alarmo
           domain: alarm_control_panel
+reset_confirmation:
+  fields:
+    entity_id:
+      example: "alarm_control_panel.alarm"
+      required: true
+      selector:
+        entity:
+          integration: alarmo
+          domain: alarm_control_panel
+    code:
+      example: "1234"
+      required: false
+      selector:
+        text:
 enable_user:
   fields:
     name:

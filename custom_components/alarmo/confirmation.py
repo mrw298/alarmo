@@ -34,6 +34,7 @@ CONFIRMATION_RULES = [RULE_DIFFERENT_SENSOR, RULE_DIFFERENT_AREA, RULE_SAME_AREA
 ATTR_CONFIRMATION_ENABLED = "confirmation_enabled"
 ATTR_CONFIRMATION_TIME = "confirmation_time"
 ATTR_CONFIRMATION_RULE = "confirmation_rule"
+ATTR_CONFIRMATION_REQUIRE_RESET = "confirmation_require_reset"
 ATTR_ENTRY_ROUTE = "entry_route"
 
 # defaults derived from the standards, to be verified against current editions
@@ -110,6 +111,7 @@ class ConfirmationTracker:
             "confirmation_status": self.status,
             "confirmed_by": self.confirmed_by,
             "confirmation_expires": self.expires.isoformat() if self.expires else None,
+            "reset_required": self._alarm_entity.reset_required,
         }
 
     @callback
@@ -186,6 +188,8 @@ class ConfirmationTracker:
         self.status = STATUS_CONFIRMED
         self.confirmed_by = [el["entity_id"] for el in pair]
         self.expires = None
+        if self._config.get(ATTR_CONFIRMATION_REQUIRE_RESET):
+            self._alarm_entity.reset_required = True
         _LOGGER.info("Alarm '%s' is confirmed", self._alarm_entity.name)
         self._fire(const.EVENT_CONFIRMED, pair)
         if self._alarm_entity.state != AlarmControlPanelState.TRIGGERED:
@@ -218,11 +222,17 @@ class ConfirmationTracker:
             self._timer = None
 
     @callback
-    def reset(self) -> None:
-        """Return to idle, discarding any tripped sensors."""
+    def reset(self, force: bool = False) -> None:
+        """Return to idle, discarding any tripped sensors.
+
+        A confirmed alarm awaiting a reset keeps its status, unless forced.
+        """
         self.cancel_timer()
-        self.status = STATUS_IDLE
-        self.confirmed_by = []
+        if force or not (
+            self.status == STATUS_CONFIRMED and self._alarm_entity.reset_required
+        ):
+            self.status = STATUS_IDLE
+            self.confirmed_by = []
         self.expires = None
         self._trips = {}
         self._entry_started = False

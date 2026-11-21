@@ -252,6 +252,11 @@ async def async_setup_entry(hass, config_entry, async_add_devices):  # noqa: PLR
         const.SERVICE_SKIP_DELAY_SCHEMA,
         "async_service_skip_delay_handler",
     )
+    platform.async_register_entity_service(
+        const.SERVICE_RESET_CONFIRMATION,
+        const.SERVICE_RESET_CONFIRMATION_SCHEMA,
+        "async_service_reset_confirmation_handler",
+    )
 
 
 async def async_unload_entry(hass, config_entry):
@@ -617,6 +622,27 @@ class AlarmoBaseEntity(AlarmControlPanelEntity, RestoreEntity):
             )
             return True
 
+    async def async_service_reset_confirmation_handler(self, code):
+        """Handle alarmo.reset_confirmation, acknowledging a confirmed alarm."""
+        _LOGGER.debug("Service alarmo.reset_confirmation was called")
+        # resetting requires the same permission as disarming
+        (res, info) = await self._validate_code(code, AlarmControlPanelState.DISARMED)
+        if not res:
+            dispatcher_send(
+                self.hass,
+                "alarmo_event",
+                info,
+                self.area_id,
+                {"command": const.SERVICE_RESET_CONFIRMATION},
+            )
+            _LOGGER.warning("Wrong code provided.")
+            return
+        areas = (
+            [self] if self.area_id else self.hass.data[const.DOMAIN]["areas"].values()
+        )
+        for item in areas:
+            item.async_reset_confirmation(self.changed_by)
+
     @callback
     def alarm_disarm(self, code=None, **kwargs):
         """Send disarm command (sync wrapper)."""
@@ -883,6 +909,7 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
 
         self.area_id = area_id
         self._timer = None
+        self.reset_required = False
         self.confirmation = ConfirmationTracker(hass, self)
         coordinator = self.hass.data[const.DOMAIN]["coordinator"]
         self._config = coordinator.store.async_get_config()
@@ -981,6 +1008,10 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
 
         # restore previous state
         state = await self.async_get_last_state()
+        if state and state.attributes.get("reset_required"):
+            self.reset_required = True
+            self.confirmation.status = STATUS_CONFIRMED
+            self.confirmation.confirmed_by = state.attributes.get("confirmed_by") or []
         if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             initial_state = state.state
             _LOGGER.debug(
@@ -1045,7 +1076,7 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
             self.hass, "alarmo_state_updated", self.area_id, old_state, state
         )
 
-    def async_arm_failure(self, open_sensors: dict, context_id=None):
+    def async_arm_failure(self, open_sensors: dict, context_id=None, reason=None):
         """Handle arm failure."""
         self._open_sensors = open_sensors
         command = self._arm_mode.replace("armed", "arm")
@@ -1070,6 +1101,7 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
                 "open_sensors": open_sensors,
                 "command": command,
                 const.ATTR_CONTEXT_ID: context_id,
+                **({"reason": reason} if reason else {}),
             },
         )
 
@@ -1084,6 +1116,15 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
         context_id = kwargs.get("context_id", None)
 
         self._arm_mode = arm_mode
+
+        if self.reset_required and self._state == AlarmControlPanelState.DISARMED:
+            _LOGGER.warning(
+                "Cannot arm '%s', the confirmed alarm must be reset first.", self.name
+            )
+            self.async_arm_failure(
+                {}, context_id=context_id, reason=const.REASON_RESET_REQUIRED
+            )
+            return False
         exit_delay = int(self._config[const.ATTR_MODES][arm_mode]["exit_time"] or 0)
 
         if skip_delay or not exit_delay:
@@ -1355,6 +1396,22 @@ class AlarmoAreaEntity(AlarmoBaseEntity):
 
         self._timer = async_track_point_in_time(self.hass, cb_func, now + delay)
 
+    @callback
+    def async_reset_confirmation(self, changed_by: str | None = None):
+        """Acknowledge a confirmed alarm, allowing the area to be armed again."""
+        if not self.reset_required:
+            return
+        self.reset_required = False
+        self.confirmation.reset(force=True)
+        _LOGGER.info("Confirmed alarm of '%s' is reset", self.name)
+        dispatcher_send(
+            self.hass,
+            "alarmo_event",
+            const.EVENT_CONFIRMATION_RESET,
+            self.area_id,
+            {"changed_by": changed_by},
+        )
+
     def update_ready_to_arm_modes(self, value):
         """Set arm modes which are ready for arming (no blocking sensors)."""
         if value == self._ready_to_arm_modes:
@@ -1415,6 +1472,10 @@ class AlarmoMasterEntity(AlarmoBaseEntity):
                     ],
                     "confirmation_expires": (
                         min(expires).isoformat() if expires else None
+                    ),
+                    "reset_required": any(
+                        item.reset_required
+                        for item in self.hass.data[const.DOMAIN]["areas"].values()
                     ),
                 }
             )
@@ -1488,7 +1549,10 @@ class AlarmoMasterEntity(AlarmoBaseEntity):
 
         @callback
         def async_handle_event(event: str, area_id: str, args: dict = {}):
-            if area_id and event in const.CONFIRMATION_EVENTS:
+            if area_id and (
+                event in const.CONFIRMATION_EVENTS
+                or event == const.EVENT_CONFIRMATION_RESET
+            ):
                 self.schedule_update_ha_state()
                 return
             if not area_id or event not in [
@@ -1709,6 +1773,15 @@ class AlarmoMasterEntity(AlarmoBaseEntity):
         context_id = kwargs.get("context_id", None)
         self._target_state = arm_mode
 
+        if any(
+            item.reset_required
+            for item in self.hass.data[const.DOMAIN]["areas"].values()
+        ):
+            self.async_arm_failure(
+                {}, context_id=context_id, reason=const.REASON_RESET_REQUIRED
+            )
+            return
+
         open_sensors = {}
         for item in self.hass.data[const.DOMAIN]["areas"].values():
             if (
@@ -1753,7 +1826,7 @@ class AlarmoMasterEntity(AlarmoBaseEntity):
                 },
             )
 
-    def async_arm_failure(self, open_sensors: dict, context_id=None):
+    def async_arm_failure(self, open_sensors: dict, context_id=None, reason=None):
         """Handle arm failure."""
         self.open_sensors = open_sensors
         command = self._target_state.replace("armed", "arm")
@@ -1773,6 +1846,7 @@ class AlarmoMasterEntity(AlarmoBaseEntity):
                 "open_sensors": open_sensors,
                 "command": command,
                 const.ATTR_CONTEXT_ID: context_id,
+                **({"reason": reason} if reason else {}),
             },
         )
         self.schedule_update_ha_state()

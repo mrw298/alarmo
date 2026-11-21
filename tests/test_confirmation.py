@@ -88,7 +88,13 @@ class Setup:
         self.hass.states.async_set(entity.entity_id, "off", attributes)
         return entity.entity_id
 
-    async def start(self, master: bool = False, **area_kwargs: Any) -> None:
+    async def start(
+        self,
+        master: bool = False,
+        users: dict[str, Any] | None = None,
+        expect: str = "armed_away",
+        **area_kwargs: Any,
+    ) -> None:
         """Start Alarmo with confirmation enabled and arm the area."""
         area = AreaFactory.create_area(
             modes=["armed_away"],
@@ -114,6 +120,7 @@ class Setup:
             sensors=self.sensors,
             entry_id="test_confirm",
             master_enabled=master,
+            users=users,
         )
         with patch_alarmo_integration_dependencies(storage):
             await self.hass.config_entries.async_setup(entry.entry_id)
@@ -127,7 +134,7 @@ class Setup:
             blocking=True,
         )
         await self.hass.async_block_till_done()
-        assert_alarm_state(self.hass, ALARM_ENTITY, "armed_away")
+        assert_alarm_state(self.hass, ALARM_ENTITY, expect)
 
     async def trip(self, entity_id: str, state: str = "on") -> None:
         """Trip a sensor, then restore it."""

@@ -50,6 +50,20 @@
         }
       }
     },
+    "reset_confirmation": {
+      "name": "Reset confirmation",
+      "description": "Acknowledge a confirmed alarm, so that the area can be armed again. Only needed when 'Require reset' is enabled for alarm confirmation.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity ID",
+          "description": "Alarm entity for which the confirmed alarm should be reset."
+        },
+        "code": {
+          "name": "Code",
+          "description": "Code of a user that is allowed to disarm the alarm."
+        }
+      }
+    },
     "enable_user": {
       "name": "Enable User",
       "description": "Allow a user to arm/disarm alarmo.",

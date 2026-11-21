@@ -32,6 +32,7 @@ This is an alarm system integration for Home Assistant. It provides a user inter
     - [alarmo.arm](#alarmoarm)
     - [alarmo.disarm](#alarmodisarm)
     - [alarmo.skip\_delay](#alarmoskip_delay)
+    - [alarmo.reset\_confirmation](#alarmoreset_confirmation)
     - [alarmo.enable\_user](#alarmoenable_user)
     - [alarmo.disable\_user](#alarmodisable_user)
     - [Events](#events)
@@ -355,6 +356,7 @@ Confirmation is configured per area in the *General* tab:
 | `Confirmation`      | Enable confirmation for the area.                                                                                                   | off                |
 | `Confirmation time` | Period after the alarm is triggered in which a second sensor confirms the alarm. It continues after the trigger time has ended.     | 30 minutes         |
 | `Confirmation rule` | Which pairs of sensors confirm each other (see below).                                                                              | Any two sensors    |
+| `Require reset`     | After a confirmed alarm, the area cannot be armed until the alarm is reset (see [alarmo.reset_confirmation](#alarmoreset_confirmation)). | off                |
 
 The rules use the areas (rooms) of Home Assistant, not Alarmo areas. The area of a sensor is taken from its entity, or else from its device.
 
@@ -369,7 +371,7 @@ The following always applies:
 - Only genuine intruder detections count: sensors that trip by becoming unavailable, *tamper* and *environmental* sensors (and sensors with device class *tamper*) never confirm.
 - Sensors with the `Entry route` option (shown in the sensor settings once confirmation is enabled) do not count once the entry delay has started, so that someone entering through the normal entry route cannot confirm an alarm. The sensor that started the entry delay is still recorded as the first trip.
 - When a [sensor group](#sensor-groups) triggers, each sensor of the group counts as a separate trip.
-- Disarming the alarm resets the confirmation. If the alarm returns to armed after the trigger time, a sensor tripping within the confirmation time confirms the alarm and triggers it again immediately.
+- Disarming the alarm resets the confirmation. With `Require reset`, disarming works as usual, but arming fails (the `alarmo_failed_to_arm` event has reason `reset_required`) until the confirmed alarm is reset. If the alarm returns to armed after the trigger time, a sensor tripping within the confirmation time confirms the alarm and triggers it again immediately.
 
 The status is shown in the attributes of the alarm entity (only for areas that have confirmation enabled; the master entity combines its areas):
 
@@ -378,6 +380,7 @@ The status is shown in the attributes of the alarm entity (only for areas that h
 | `confirmation_status`  | `idle`, `unconfirmed` (waiting for a second sensor), `confirmed` or `expired`. |
 | `confirmed_by`         | The two sensors that confirmed the alarm.                                     |
 | `confirmation_expires` | End of the confirmation time, while waiting for a second sensor.              |
+| `reset_required`       | The alarm was confirmed and must be reset before arming (`Require reset`). This is kept after a restart of HA. |
 
 For [actions and notifications](#automations), the conditions *Alarm is unconfirmed*, *Alarm is confirmed* and *Alarm confirmation expired* are available, and the `{{confirmed_by}}` wildcard gives the names of the confirming sensors.
 The same moments are sent as the events `alarmo_unconfirmed`, `alarmo_confirmed` and `alarmo_confirmation_expired` (and on the MQTT event topic). The event data contains `entity_id` and `area_id` (as for other Alarmo events), the `rule`, and `sensors`: a list with the `entity_id`, `ha_area_id` and `device_id` of each sensor (for `alarmo_confirmed`, the confirming pair).
@@ -441,6 +444,15 @@ This service only has effect when the alarm entity is in the `arming` or `pendin
 | ----------- | ----------------- | ----------------------- | ---------------------------- |
 | `entity_id` | Required          | Entity-ID of the alarm. | `alarm_control_panel.alarmo` |
 
+### alarmo.reset_confirmation
+Reset (acknowledge) a confirmed alarm, so that the area can be armed again. Only needed when `Require reset` is enabled for [alarm confirmation](#alarm-confirmation).
+The code is validated in the same way as for disarming: the user must be allowed to disarm the area. Calling it for the master entity resets all areas.
+Once reset, the event `alarmo_confirmation_reset` is sent (with `entity_id`, `area_id` and `changed_by`).
+| Setting     | Optional/required | Description                                                       | Example value                |
+| ----------- | ----------------- | ----------------------------------------------------------------- | ---------------------------- |
+| `entity_id` | Required          | Entity-ID of the alarm.                                           | `alarm_control_panel.alarmo` |
+| `code`      | Optional          | Code of a user allowed to disarm (required if a code is needed to disarm). | `1234`                       |
+
 ### alarmo.enable_user
 Enable a user for operating the alarm using his/her configured code.
 
@@ -467,7 +479,7 @@ The following table provides the data that is provided with the `alarmo_failed_t
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | `entity_id`    | Entity-ID of the alarm. Particularly useful in case multiple areas are configured.                                                                                                                    | `alarm_control_panel.alarmo` |
 | `area_id`      | Internal ID assigned by Alarmo to the area. Particularly useful in case multiple areas are configured. Unaffected by renaming of the area (in contrast to `entity_id`).                               | `12345678`                   |
-| `reason`       | Reason/context of why the arming failed. Possible values: `open_sensors`, `not_allowed`, `invalid_code`.                                                                                              | `sensors`               |
+| `reason`       | Reason/context of why the arming failed. Possible values: `open_sensors`, `not_allowed`, `invalid_code`, `reset_required` (see [alarm confirmation](#alarm-confirmation)).                                                                                              | `sensors`               |
 | `sensors` | list of entity-IDs of the sensors causing the failure. Only set if `reason` equals `open_sensors`.                                                                                                    | [`binary_sensor.front_door`] |
 | `command`      | Arming mode used for the operation (which has failed).                                                                                                                                                | `arm_away`                   |
 | `context_id`   | If `alarmo.arm` or `alarmo.disarm` service was used prior to the failure and `context_id` was provided with this service, the same value will be returned. Otherwise this parameter will not be sent. | `23`                         |

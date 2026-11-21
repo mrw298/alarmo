@@ -33,6 +33,7 @@ AREA_CONFIRMATION_KEYS = [
     "confirmation_enabled",
     "confirmation_time",
     "confirmation_rule",
+    "confirmation_require_reset",
 ]
 
 
@@ -86,6 +87,7 @@ class AreaEntry:
     confirmation_enabled = attr.ib(type=bool, default=False)
     confirmation_time = attr.ib(type=int, default=DEFAULT_CONFIRMATION_TIME)
     confirmation_rule = attr.ib(type=str, default=RULE_DIFFERENT_SENSOR)
+    confirmation_require_reset = attr.ib(type=bool, default=False)
 
 
 @attr.s(slots=True, frozen=True)
